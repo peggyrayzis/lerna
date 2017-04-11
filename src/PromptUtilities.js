@@ -26,13 +26,15 @@ export default class PromptUtilities {
     }]).then((answers) => callback(answers.prompt));
   }
 
-  static input(message, { filter, validate } = {}, callback) {
+  static input(message, {default: defaultAnswer, filter, validate} = {}, callback) {
     inquirer.prompt([{
       type: "input",
       name: "input",
+      default: defaultAnswer,
       message: message,
       filter: filter,
       validate: validate
-    }]).then((answers) => callback(answers.input));
+    }])
+    .then((answers) => callback(answers.input));
   }
 }

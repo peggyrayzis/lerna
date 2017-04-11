@@ -1,8 +1,11 @@
+import path from "path";
 import _ from "lodash";
 import writePkg from "write-pkg";
 import writeJsonFile from "write-json-file";
+import isValid from "is-valid-path";
 import FileSystemUtilities from "../FileSystemUtilities";
 import GitUtilities from "../GitUtilities";
+import PromptUtilities from "../PromptUtilities";
 import Command from "../Command";
 
 export default class InitCommand extends Command {
@@ -22,11 +25,38 @@ export default class InitCommand extends Command {
   }
 
   execute(callback) {
-    this.ensurePackageJSON();
-    this.ensureLernaJson();
-    this.ensureNoVersionFile();
-    this.logger.success("Successfully initialized Lerna files");
-    callback(null, true);
+    this.ensurePackageLocation((err, filePath) => {
+      if (err) {
+        callback(err);
+        return;
+      }
+
+      if (!FileSystemUtilities.existsSync(filePath)) {
+        this.logger.info(`Creating package directory in ${filePath}/.`);
+        FileSystemUtilities.mkdirSync(filePath);
+      }
+
+      this.repository.packageLocation = filePath;
+
+      this.ensurePackageJSON();
+      this.ensureLernaJson();
+      this.ensureNoVersionFile();
+      this.logger.success("Successfully initialized Lerna files");
+      callback(null, true);
+    });
+  }
+
+  ensurePackageLocation(callback) {
+    const { packageLocation } = this.repository.lernaJson;
+
+    if (packageLocation) return callback(null, packageLocation);
+
+    PromptUtilities.input("Location of packages?", {
+      default: ".",
+      validate: (path) => isValid(path) ? true : "Please enter a valid file path."
+    }, (filePath) => {
+      callback(null, path.join(filePath, "packages"));
+    });
   }
 
   ensurePackageJSON() {
@@ -81,7 +111,8 @@ export default class InitCommand extends Command {
     Object.assign(lernaJson, {
       lerna: this.lernaVersion,
       packages: this.repository.packageConfigs,
-      version: version
+      version: version,
+      packageLocation: this.repository.packageLocation
     });
 
     if (this.exact) {
